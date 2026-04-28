@@ -1,4 +1,5 @@
 // src/App.jsx
+// Main routing and protected navigation setup
 import React from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { Toaster } from "react-hot-toast";
