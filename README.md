@@ -30,6 +30,10 @@ A smart cocoon monitoring and energy tracking system.
 - **Charts**: Recharts
 - **Deployment**: Vercel (frontend)
 - **Version Control**: GitHub
+## Tech Stack Overview:
+- React  
+- Tailwind CSS  
+- Firebase  
 
 ---
 
