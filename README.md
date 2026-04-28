@@ -8,6 +8,11 @@ A mobile-first React web app for silkworm cocoon farmers to monitor batches, tra
 
 | Module | What it does |
 |---|---|
+# CocoonTrack
+A smart cocoon monitoring and energy tracking system.
+- Real-time monitoring
+- Device control
+- Energy optimization
 | **Dashboard** | Active batch summary, market price ticker, weather widget, alerts |
 | **Batch Management** | Create batches, track lifecycle (Egg→Instar→Spinning→Harvest), daily health logs, disease checker with treatment advice |
 | **Environment Monitor** | Manual temperature/humidity entry, visual range bars, 7-day trend chart (IoT-ready hook) |
