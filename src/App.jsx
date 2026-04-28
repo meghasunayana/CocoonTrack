@@ -16,7 +16,7 @@ function ProtectedRoute({ children }) {
   if (loading) return <div className="flex items-center justify-center h-screen text-green-700 text-sm">Loading...</div>;
   if (!user) return <Navigate to="/login" />;
   return (
-    <div className="max-w-lg mx-auto min-h-screen bg-white relative">
+    <div className="max-w-lg mx-auto min-h-screen bg-white relative bg-white">
       {children}
       <BottomNav />
     </div>
