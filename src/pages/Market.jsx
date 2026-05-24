@@ -1,7 +1,9 @@
 // src/pages/Market.jsx
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import toast from "react-hot-toast";
+import { useAuth } from "../context/AuthContext";
+import { createPriceAlert, getPriceAlerts, deletePriceAlert } from "../firebase/db";
 
 const GRADES = {
   A: { price: 485, change: +12, trend: "up" },
@@ -24,14 +26,69 @@ const generateHistory = (base) =>
   }));
 
 export default function Market() {
+  const { user } = useAuth();
   const [activeGrade, setActiveGrade] = useState("A");
   const [alertPrice, setAlertPrice] = useState("");
+  const [alerts, setAlerts] = useState([]);
+  const [alertsLoading, setAlertsLoading] = useState(true);
+
   const history = generateHistory(GRADES[activeGrade].price);
 
-  const handleSetAlert = () => {
+  useEffect(() => {
+    if (!user) return;
+    loadAlerts();
+  }, [user]);
+
+  const loadAlerts = async () => {
+    setAlertsLoading(true);
+    try {
+      const data = await getPriceAlerts(user.uid);
+      setAlerts(data);
+    } catch (err) {
+      console.error("Error loading alerts:", err);
+    } finally {
+      setAlertsLoading(false);
+    }
+  };
+
+  const handleSetAlert = async () => {
     if (!alertPrice) { toast.error("Enter a price"); return; }
-    toast.success(`Alert set for ₹${alertPrice}/kg`);
+    if (!user) { toast.error("You must be logged in to set alerts"); return; }
+    
+    const priceVal = parseFloat(alertPrice);
+    if (isNaN(priceVal) || priceVal <= 0) { toast.error("Enter a valid price"); return; }
+
+    const tempId = Date.now().toString();
+    const newAlert = { id: tempId, alertPrice: priceVal, grade: activeGrade, createdAt: new Date() };
+    setAlerts([newAlert, ...alerts]);
+    toast.success(`Alert set for ₹${priceVal}/kg`);
     setAlertPrice("");
+
+    try {
+      await createPriceAlert(user.uid, {
+        alertPrice: priceVal,
+        grade: activeGrade
+      });
+      loadAlerts();
+    } catch (err) {
+      console.error("Error setting alert in database:", err);
+      toast.error("Failed to save alert in database");
+      setAlerts(prev => prev.filter(a => a.id !== tempId));
+    }
+  };
+
+  const handleDeleteAlert = async (alertId) => {
+    setAlerts(prev => prev.filter(a => a.id !== alertId));
+    toast.success("Alert deleted");
+
+    try {
+      await deletePriceAlert(alertId);
+      loadAlerts();
+    } catch (err) {
+      console.error("Error deleting alert:", err);
+      toast.error("Failed to delete alert from database");
+      loadAlerts();
+    }
   };
 
   return (
@@ -83,12 +140,35 @@ export default function Market() {
       {/* Price alert */}
       <div className="px-4 mt-4">
         <div className="bg-amber-50 border border-amber-100 rounded-xl p-4">
-          <div className="text-sm font-medium text-amber-700 mb-2">🔔 Set Price Alert</div>
-          <div className="flex gap-2">
+          <div className="text-sm font-medium text-amber-700 mb-2">🔔 Set Price Alert (Grade {activeGrade})</div>
+          <div className="flex gap-2 mb-3">
             <input type="number" value={alertPrice} onChange={e => setAlertPrice(e.target.value)}
               placeholder="Notify when price ≥ ₹" className="flex-1 border border-amber-200 bg-white rounded-lg px-3 py-2 text-sm outline-none focus:border-amber-400" />
             <button onClick={handleSetAlert} className="bg-amber-500 text-white px-4 py-2 rounded-lg text-sm font-medium">Set</button>
           </div>
+
+          {/* Active Alerts List */}
+          {user && (
+            <div className="border-t border-amber-200/50 pt-3 mt-3">
+              <div className="text-xs font-semibold text-amber-800 uppercase tracking-wider mb-2">Active Target Alerts</div>
+              {alertsLoading && alerts.length === 0 ? (
+                <div className="text-xs text-amber-600/70 py-1">Loading alerts...</div>
+              ) : alerts.length === 0 ? (
+                <div className="text-xs text-amber-600/70 py-1">No target price alerts configured yet.</div>
+              ) : (
+                <div className="space-y-1.5 max-h-40 overflow-y-auto">
+                  {alerts.map((a) => (
+                    <div key={a.id} className="flex justify-between items-center bg-white border border-amber-100 rounded-lg px-3 py-1.5 text-xs text-gray-700 shadow-sm">
+                      <span className="font-medium">Grade {a.grade}: ≥ ₹{a.alertPrice}/kg</span>
+                      <button onClick={() => handleDeleteAlert(a.id)} className="text-red-500 hover:text-red-700 font-bold px-1 py-0.5" title="Delete Alert">
+                        🗑
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
 

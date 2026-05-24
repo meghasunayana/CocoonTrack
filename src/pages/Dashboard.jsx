@@ -8,12 +8,92 @@ const MARKET_PRICES = { A: 485, B: 420, C: 350 };
 
 const STAGE_ORDER = ["Egg", "Instar 1-2", "Instar 3-4", "Instar 5", "Spinning", "Harvest"];
 
+const mapWmoToWeather = (code) => {
+  const mappings = {
+    0: { icon: "☀️", label: "Clear sky" },
+    1: { icon: "🌤", label: "Mainly clear" },
+    2: { icon: "⛅", label: "Partly cloudy" },
+    3: { icon: "☁️", label: "Overcast" },
+    45: { icon: "🌫", label: "Fog" },
+    48: { icon: "🌫", label: "Depositing rime fog" },
+    51: { icon: "🌦", label: "Light drizzle" },
+    53: { icon: "🌦", label: "Moderate drizzle" },
+    55: { icon: "🌦", label: "Dense drizzle" },
+    61: { icon: "🌧", label: "Slight rain" },
+    63: { icon: "🌧", label: "Moderate rain" },
+    65: { icon: "🌧", label: "Heavy rain" },
+    71: { icon: "🌨", label: "Slight snow fall" },
+    73: { icon: "🌨", label: "Moderate snow fall" },
+    75: { icon: "🌨", label: "Heavy snow fall" },
+    80: { icon: "🌦", label: "Slight rain showers" },
+    81: { icon: "🌦", label: "Moderate rain showers" },
+    82: { icon: "🌧", label: "Violent rain showers" },
+    95: { icon: "⛈", label: "Thunderstorm" },
+  };
+  return mappings[code] || { icon: "🌤", label: "Partly cloudy" };
+};
+
+const getDayName = (dateStr) => {
+  const date = new Date(dateStr);
+  return date.toLocaleDateString("en-US", { weekday: "short" });
+};
+
 export default function Dashboard() {
   const { user, logout } = useAuth();
   const [batches, setBatches] = useState([]);
   const [sales, setSales] = useState([]);
   const [expenses, setExpenses] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [weather, setWeather] = useState(null);
+  const [weatherLoading, setWeatherLoading] = useState(true);
+  const [weatherError, setWeatherError] = useState(null);
+  const [weatherLocationName, setWeatherLocationName] = useState("Mysuru");
+
+  useEffect(() => {
+    const fetchWeather = async (lat, lon, isFallback = false) => {
+      setWeatherLoading(true);
+      setWeatherError(null);
+      try {
+        console.log(`Weather: Fetching data for lat: ${lat}, lon: ${lon}`);
+        const response = await fetch(
+          `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,apparent_temperature,weather_code,wind_speed_10m&daily=weather_code,temperature_2m_max,temperature_2m_min&timezone=auto&forecast_days=4`
+        );
+        if (!response.ok) throw new Error("Weather API call failed");
+        const data = await response.json();
+        console.log("Weather: Successfully fetched data:", data);
+        setWeather(data);
+        if (isFallback) {
+          setWeatherLocationName("Mysuru (Default)");
+        } else {
+          setWeatherLocationName("Local Rearing House");
+        }
+      } catch (err) {
+        console.error("Weather error:", err);
+        setWeatherError("Failed to fetch live weather details.");
+      } finally {
+        setWeatherLoading(false);
+      }
+    };
+
+    if (navigator.geolocation) {
+      console.log("Weather: Requesting user location...");
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const { latitude, longitude } = position.coords;
+          fetchWeather(latitude, longitude, false);
+        },
+        (error) => {
+          console.warn("Weather: Geolocation error, falling back to Mysuru", error);
+          // Fallback to Mysuru coordinates (latitude: 12.2958, longitude: 76.6394)
+          fetchWeather(12.2958, 76.6394, true);
+        },
+        { timeout: 5000 }
+      );
+    } else {
+      console.warn("Weather: Geolocation not supported, falling back to Mysuru");
+      fetchWeather(12.2958, 76.6394, true);
+    }
+  }, []);
 
   useEffect(() => {
     console.log("Dashboard: useEffect triggered, user:", user?.uid);
@@ -55,6 +135,27 @@ export default function Dashboard() {
   const activeBatches = displayBatches.filter((b) => b.status === "active");
   const totalRevenue = sales.length > 0 ? sales.reduce((sum, s) => sum + (s.total || 0), 0) : 45200;
   const totalExpenses = expenses.length > 0 ? expenses.reduce((sum, e) => sum + (e.amount || 0), 0) : 12400;
+
+  const currentCondition = weather && weather.current ? mapWmoToWeather(weather.current.weather_code) : { icon: "🌤", label: "Partly cloudy" };
+  const currentTemp = weather && weather.current ? Math.round(weather.current.temperature_2m) : 29;
+  const currentHumid = weather && weather.current ? Math.round(weather.current.relative_humidity_2m) : 72;
+  const currentWind = weather && weather.current ? Math.round(weather.current.wind_speed_10m) : 12;
+
+  const displayForecast = weather && weather.daily ? weather.daily.time.map((time, idx) => {
+    const code = weather.daily.weather_code[idx];
+    const maxTemp = Math.round(weather.daily.temperature_2m_max[idx]);
+    const wInfo = mapWmoToWeather(code);
+    return {
+      day: getDayName(time),
+      icon: wInfo.icon,
+      temp: `${maxTemp}°`
+    };
+  }) : [
+    { day: "Mon", icon: "☀️", temp: "31°" },
+    { day: "Tue", icon: "🌤", temp: "29°" },
+    { day: "Wed", icon: "🌧", temp: "25°" },
+    { day: "Thu", icon: "⛅", temp: "27°" },
+  ];
 
   const stageColor = (stage) => {
     const idx = STAGE_ORDER.indexOf(stage);
@@ -182,19 +283,41 @@ export default function Dashboard() {
           Today's Weather
         </h2>
         <div className="bg-white border border-gray-100 rounded-xl p-4">
-          <div className="flex items-center gap-2 text-sm text-gray-600">
-            <span>🌤</span>
-            <span>Mysuru · 29°C · Humidity: 72% · Wind: 12 km/h</span>
-          </div>
-          <div className="grid grid-cols-4 gap-2 mt-3">
-            {[
-              { day: "Mon", icon: "☀️", temp: "31°" },
-              { day: "Tue", icon: "🌤", temp: "29°" },
-              { day: "Wed", icon: "🌧", temp: "25°" },
-              { day: "Thu", icon: "⛅", temp: "27°" },
-            ].map((w) => (
+          {weatherLoading ? (
+            <div className="flex items-center justify-center py-4 text-xs text-gray-400 gap-2">
+              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-green-700"></div>
+              <span>Detecting location & loading weather...</span>
+            </div>
+          ) : weatherError ? (
+            <div className="text-xs text-red-500 py-2">
+              ⚠️ {weatherError} Showing default for Mysuru.
+            </div>
+          ) : (
+            <>
+              <div className="flex items-center justify-between text-sm text-gray-600 border-b border-gray-50 pb-2 mb-3">
+                <div className="flex items-center gap-1.5 font-medium text-gray-800">
+                  <span>📍</span>
+                  <span>{weatherLocationName}</span>
+                </div>
+                <div className="text-xs bg-green-50 text-green-700 px-2 py-0.5 rounded-full font-medium">
+                  {currentCondition.label}
+                </div>
+              </div>
+              <div className="flex items-center gap-3 text-sm text-gray-600">
+                <span className="text-2xl">{currentCondition.icon}</span>
+                <span className="font-semibold text-gray-800">{currentTemp}°C</span>
+                <span>·</span>
+                <span>Humidity: {currentHumid}%</span>
+                <span>·</span>
+                <span>Wind: {currentWind} km/h</span>
+              </div>
+            </>
+          )}
+
+          <div className="grid grid-cols-4 gap-2 mt-4">
+            {displayForecast.map((w, idx) => (
               <div
-                key={w.day}
+                key={`${w.day}-${idx}`}
                 className="bg-gray-50 rounded-lg p-2 text-center border border-gray-100"
               >
                 <div className="text-xs text-gray-400">{w.day}</div>

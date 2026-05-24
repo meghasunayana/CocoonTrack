@@ -15,6 +15,8 @@ export default function Sales() {
   const [expForm, setExpForm] = useState({ category: "Feed (Mulberry)", amount: "", notes: "" });
   const [showSaleForm, setShowSaleForm] = useState(false);
   const [showExpForm, setShowExpForm] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [loadingData, setLoadingData] = useState(true);
 
   const DEMO_SALES = [
     { id: "s1", buyer: "Ramanagara Silk Exchange", grade: "A", weight: 120, pricePerKg: 495, total: 59400 },
@@ -27,8 +29,28 @@ export default function Sales() {
     { id: "e3", category: "Labor", amount: 3000, notes: "Cleaning & harvesting help" }
   ];
 
-  const displaySales = sales.length > 0 ? sales : DEMO_SALES;
-  const displayExpenses = expenses.length > 0 ? expenses : DEMO_EXPENSES;
+  useEffect(() => {
+    if (!user) return;
+    setLoadingData(true);
+    console.log("Sales: Fetching records from Firestore...");
+    Promise.all([getSales(user.uid), getExpenses(user.uid)])
+      .then(([s, e]) => {
+        console.log("Sales: Success, fetched records:", { sales: s.length, expenses: e.length });
+        setSales(s);
+        setExpenses(e);
+      })
+      .catch((err) => {
+        console.error("Sales: Error loading records from Firestore", err);
+        toast.error("Failed to load records from Firestore");
+      })
+      .finally(() => {
+        setLoadingData(false);
+      });
+  }, [user]);
+
+  const isUsingDemo = sales.length === 0 && expenses.length === 0 && !loadingData;
+  const displaySales = sales.length > 0 ? sales : (isUsingDemo ? DEMO_SALES : []);
+  const displayExpenses = expenses.length > 0 ? expenses : (isUsingDemo ? DEMO_EXPENSES : []);
 
   const totalRevenue = displaySales.reduce((s, x) => s + (x.total || 0), 0);
   const totalExpenses = displayExpenses.reduce((s, x) => s + (x.amount || 0), 0);
@@ -47,7 +69,7 @@ export default function Sales() {
     setSaving(true);
     // Optimistic UI
     const newSale = { id: Date.now().toString(), ...saleForm, total, weight: parseFloat(saleForm.weight), pricePerKg: parseFloat(saleForm.pricePerKg) };
-    setSales([newSale, ...displaySales]);
+    setSales([newSale, ...sales]);
     setShowSaleForm(false);
 
     try {
@@ -66,7 +88,7 @@ export default function Sales() {
     setSaving(true);
     // Optimistic UI
     const newExp = { id: Date.now().toString(), ...expForm, amount: parseFloat(expForm.amount) };
-    setExpenses([newExp, ...displayExpenses]);
+    setExpenses([newExp, ...expenses]);
     setShowExpForm(false);
 
     try {
@@ -80,11 +102,34 @@ export default function Sales() {
     }
   };
 
+  if (loadingData) {
+    return (
+      <div className="pb-20">
+        <div className="bg-green-700 text-white px-4 pt-5 pb-4">
+          <div className="font-semibold text-lg">Sales & Income</div>
+        </div>
+        <div className="flex flex-col items-center justify-center h-64 text-green-700">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-700 mb-2"></div>
+          <div className="text-sm">Loading records...</div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="pb-20">
       <div className="bg-green-700 text-white px-4 pt-5 pb-4">
         <div className="font-semibold text-lg">Sales & Income</div>
       </div>
+
+      {isUsingDemo && (
+        <div className="mx-4 mt-4 bg-amber-50 border border-amber-200 text-amber-800 text-xs rounded-xl p-3 flex items-start gap-2">
+          <span>💡</span>
+          <div>
+            <strong>Demo Mode:</strong> Showing sample records because your database is empty. Click <strong>+ Log Sale</strong> or <strong>+ Add Expense</strong> to start tracking your own.
+          </div>
+        </div>
+      )}
 
       {/* Summary metrics */}
       <div className="grid grid-cols-2 gap-3 px-4 mt-4">

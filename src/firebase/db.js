@@ -170,3 +170,43 @@ export const getBatchLogs = async (userId, batchId) => {
     throw error;
   }
 };
+
+// ─── PRICE ALERTS ──────────────────────────────────────────
+export const createPriceAlert = async (userId, data) => {
+  console.log("createPriceAlert: starting...", { userId, data });
+  try {
+    const docRef = await addDoc(collection(db, "priceAlerts"), {
+      ...data,
+      userId,
+      createdAt: serverTimestamp(),
+    });
+    console.log("createPriceAlert: success", docRef.id);
+    return docRef;
+  } catch (error) {
+    console.error("createPriceAlert error:", error);
+    throw error;
+  }
+};
+
+export const getPriceAlerts = async (userId) => {
+  try {
+    const q = query(collection(db, "priceAlerts"), where("userId", "==", userId));
+    const snap = await getDocs(q);
+    const data = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+    return data.sort((a, b) => getMillis(b.createdAt) - getMillis(a.createdAt));
+  } catch (error) {
+    console.error("getPriceAlerts error:", error);
+    throw error;
+  }
+};
+
+export const deletePriceAlert = async (alertId) => {
+  try {
+    await deleteDoc(doc(db, "priceAlerts", alertId));
+    console.log("deletePriceAlert: success", alertId);
+  } catch (error) {
+    console.error("deletePriceAlert error:", error);
+    throw error;
+  }
+};
+
