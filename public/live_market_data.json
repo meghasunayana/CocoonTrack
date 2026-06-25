@@ -1,0 +1,26 @@
+[
+  {
+    "market": "Ramanagara",
+    "type": "Cross Breed",
+    "min": 480,
+    "max": 620,
+    "avg": 550,
+    "date": "25/05/2026"
+  },
+  {
+    "market": "Mysuru",
+    "type": "Cross Breed",
+    "min": 460,
+    "max": 590,
+    "avg": 525,
+    "date": "25/05/2026"
+  },
+  {
+    "market": "Sidlaghatta",
+    "type": "Bivoltine",
+    "min": 510,
+    "max": 680,
+    "avg": 590,
+    "date": "25/05/2026"
+  }
+]
